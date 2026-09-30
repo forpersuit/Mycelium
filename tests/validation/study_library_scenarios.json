@@ -1,0 +1,132 @@
+{
+  "benchmark_name": "StudyLibraryAdaptiveRAGBenchmark",
+  "version": "1.0.0",
+  "description": "Validation benchmark for Adaptive Multi-Tier RAG across real-world personal study materials (E:\\me\\Documents\\学习资料)",
+  "scenarios": [
+    {
+      "id": "SCENARIO-01",
+      "name": "cross_document_radar_search",
+      "title": "跨文档雷达宏观定位 (Cross-Document Macro Radar Search)",
+      "material_type": "Multi-book library (50+ mixed technical books, manuals, and papers)",
+      "query": "我这几十本书和资料里，哪几本详细讲了 epoll 的水平触发 (LT) 与边缘触发 (ET) 的区别？",
+      "user_intent": "macro_cross_document_routing",
+      "expected_routing": "Tier1_FTS_Macro_Filter",
+      "expected_behavior": {
+        "max_turn_count": 1,
+        "max_latency_seconds": 1.0,
+        "target_books_recalled": [
+          "Linux高性能网络编程.pdf",
+          "深入理解Nginx模块开发.pdf"
+        ],
+        "requires_cross_doc_scanning": true,
+        "agent_browsing_hops": 0
+      },
+      "evaluation_metrics": {
+        "recall_at_top3": 1.0,
+        "time_to_first_token_ms": 600,
+        "total_tokens_consumed_max": 2500
+      },
+      "ground_truth_assertion": "Must return top candidate books and chapters in a single turn without sequentially browsing documents one-by-one."
+    },
+    {
+      "id": "SCENARIO-02",
+      "name": "fast_syntax_param_lookup",
+      "title": "语法参数与确切事实闪电快查 (Fast Syntax & Parameter Lookup)",
+      "material_type": "Dense technical manual / Language specification (e.g., Go/Kubernetes spec)",
+      "query": "Go 语言标准库中 sync.Pool 私有对象回收发生在 GC 的哪一个具体阶段？",
+      "user_intent": "factoid_fast_lookup",
+      "expected_routing": "Tier1_Small_To_Big",
+      "expected_behavior": {
+        "max_turn_count": 1,
+        "max_latency_seconds": 0.8,
+        "expansion_scope": "enclosing_subsection",
+        "agent_browsing_hops": 0,
+        "quote_exact_match": true
+      },
+      "evaluation_metrics": {
+        "accuracy": 1.0,
+        "latency_seconds_max": 1.0,
+        "tokens_consumed_max": 1200
+      },
+      "ground_truth_assertion": "Must pinpoint the exact sentence/paragraph and expand to its natural subsection in under 1 second without reading table of contents."
+    },
+    {
+      "id": "SCENARIO-03",
+      "name": "deep_single_book_study",
+      "title": "单本大作连续深度沉浸研读 (Deep Single-Book Continuous Study Session)",
+      "material_type": "Thick textbook / 800-page monograph (e.g., 分布式系统原理与工程实践)",
+      "session_turns": [
+        {
+          "turn": 1,
+          "query": "简要概述本书第三章复制状态机模型的核心假设。",
+          "expected_cache_state": "cold_start_or_lazy_trigger",
+          "max_latency_seconds": 2.0
+        },
+        {
+          "turn": 2,
+          "query": "为什么 Raft 协议不允许非 Leader 节点直接向状态机提交日志？请结合第四章安全原则详细说明。",
+          "expected_cache_state": "cache_promoted",
+          "max_latency_seconds": 0.8
+        },
+        {
+          "turn": 3,
+          "query": "对比第三章 Paxos 与第四章 Raft 在选举阶段日志冲突时的决断差异，指出优劣。",
+          "expected_cache_state": "cache_hit_pure_attention",
+          "max_latency_seconds": 0.5
+        }
+      ],
+      "expected_routing": "Tier2_Lazy_KV_Cache",
+      "expected_behavior": {
+        "cache_promotion_turn": 2,
+        "subsequent_turns_agent_hops": 0,
+        "quote_then_answer_enforced": true
+      },
+      "evaluation_metrics": {
+        "cached_query_latency_ms": 400,
+        "cross_chapter_coherence_score": 0.95,
+        "pruning_miss_rate": 0.0
+      },
+      "ground_truth_assertion": "Turn >= 2 must hit KV cache with sub-second response, utilizing full-document attention without multi-turn tree backtracking."
+    },
+    {
+      "id": "SCENARIO-04",
+      "name": "slides_flat_notes_without_toc",
+      "title": "无目录 PPT 课件与散篇笔记解析 (Unstructured Slides & Notes Without TOC)",
+      "material_type": "PDF exported from Keynote/PowerPoint or flat Markdown notes (0 TOC nodes)",
+      "query": "第 28 页的微服务熔断降级策略包含哪三个核心阈值指标？",
+      "user_intent": "flat_visual_slide_query",
+      "expected_routing": "Tier1_Layout_Window_Fallback",
+      "expected_behavior": {
+        "degradation_mode": "sliding_layout_clustering",
+        "avoid_tree_deadlock": true,
+        "agent_browsing_hops": 0
+      },
+      "evaluation_metrics": {
+        "tree_failure_handled": true,
+        "recall": 1.0,
+        "latency_seconds_max": 1.2
+      },
+      "ground_truth_assertion": "Must gracefully handle empty TOC structures without hanging or falling back to sequential blind page traversal."
+    },
+    {
+      "id": "SCENARIO-05",
+      "name": "multimodal_diagram_formula",
+      "title": "多模态系统架构图与公式原页直读 (Multimodal Architecture Diagram & Math Page)",
+      "material_type": "Paper with complex vector architecture diagrams and formulas (Figure 4 on page 17)",
+      "query": "请结合第 17 页的系统交互时序图，解释协调器向参与者发送 Prepare 消息失败后的超时回滚路径。",
+      "user_intent": "visual_diagram_comprehension",
+      "expected_routing": "Tier4_Multimodal_Page_Dispatch",
+      "expected_behavior": {
+        "render_page_image": true,
+        "target_page_index": 17,
+        "vlm_dispatch": true,
+        "preserve_spatial_arrows": true
+      },
+      "evaluation_metrics": {
+        "diagram_interpretation_accuracy": 0.95,
+        "text_only_hallucination_rate": 0.0
+      },
+      "ground_truth_assertion": "Must detect high visual complexity and pass the rendered PDF page image directly to VLM rather than relying on stripped plain text."
+    }
+  ]
+}
